@@ -1,171 +1,134 @@
-let products = JSON.parse(localStorage.getItem("products")) || [];
-let sales = JSON.parse(localStorage.getItem("sales")) || [];
-let currentUserRole = null;
+document.addEventListener('DOMContentLoaded', () => {
+    const inventoryList = document.getElementById('inventory-list');
+    const itemForm = document.getElementById('item-form');
+    const itemIdInput = document.getElementById('item-id');
+    const itemNameInput = document.getElementById('item-name');
+    const itemQuantityInput = document.getElementById('item-quantity');
+    const itemPriceInput = document.getElementById('item-price');
+    const showAddItemBtn = document.getElementById('show-add-item-btn');
+    const addItemFormSection = document.getElementById('add-item-form-section');
+    const cancelBtn = document.getElementById('cancel-btn');
+    const submitBtn = document.getElementById('submit-btn');
+    const feedbackMessage = document.getElementById('feedback-message');
 
-const loginForm = document.getElementById("loginForm");
-const productForm = document.getElementById("productForm");
-const saleForm = document.getElementById("saleForm");
-const searchBox = document.getElementById("searchBox");
-const reportDate = document.getElementById("reportDate");
-const logoutBtn = document.getElementById("logoutBtn");
+    let inventory = JSON.parse(localStorage.getItem('inventory')) || [];
 
-function saveData() {
-  localStorage.setItem("products", JSON.stringify(products));
-  localStorage.setItem("sales", JSON.stringify(sales));
-}
-
-function showSection(id) {
-  document.querySelectorAll(".section").forEach(sec => sec.style.display = "none");
-  document.getElementById(id).style.display = "block";
-  if (id === "inventory") renderTable();
-  if (id === "salesReport") renderSalesReport();
-}
-
-function renderTable(filter = "") {
-  const tbody = document.querySelector("#inventoryTable tbody");
-  tbody.innerHTML = "";
-  const filteredProducts = products.filter(p => p.qty > 0 && p.name.toLowerCase().includes(filter.toLowerCase()));
-
-  filteredProducts.forEach((p, i) => {
-    const row = document.createElement("tr");
-    row.innerHTML = `
-      <td>${p.name} (${p.uom || ""})</td>
-      <td>${p.qty}</td>
-      <td>₹${p.price.toFixed(2)}</td>
-      <td>
-        ${currentUserRole === 'admin' ? `
-          <button class="button-secondary edit-btn" data-index="${products.indexOf(p)}">Edit</button>
-          <button class="button-danger delete-btn" data-index="${products.indexOf(p)}">Delete</button>
-        ` : ''}
-      </td>
-    `;
-    tbody.appendChild(row);
-  });
-  renderSaleOptions();
-}
-
-function renderSaleOptions() {
-  const select = document.getElementById("saleProductSelect");
-  select.innerHTML = "";
-  products.forEach((p, i) => {
-    if (p.qty > 0) {
-      const option = document.createElement("option");
-      option.value = i;
-      option.text = `${p.name} (Available: ${p.qty})`;
-      select.appendChild(option);
+    // Helper function to show a feedback message
+    function showFeedback(message, isError = false) {
+        feedbackMessage.textContent = message;
+        feedbackMessage.className = isError ? 'feedback-error' : 'feedback-success';
+        feedbackMessage.classList.remove('hidden');
+        setTimeout(() => {
+            feedbackMessage.classList.add('hidden');
+        }, 3000);
     }
-  });
-}
 
-function renderSalesReport() {
-  const tbody = document.getElementById("reportTable");
-  const selectedDate = reportDate.value;
-  tbody.innerHTML = "";
-
-  const filteredSales = sales.filter(s => !selectedDate || s.date === selectedDate);
-
-  filteredSales.forEach(s => {
-    const row = document.createElement("tr");
-    row.innerHTML = `<td>${s.name}</td><td>${s.qty}</td><td>₹${s.total.toFixed(2)}</td><td>${s.date}</td>`;
-    tbody.appendChild(row);
-  });
-}
-
-// Event Listeners
-
-loginForm.addEventListener("submit", function (e) {
-  e.preventDefault();
-  const role = document.getElementById("userRole").value;
-  const pass = document.getElementById("userPassword").value;
-  if ((role === "admin" && pass === "admin123") || (role === "cashier" && pass === "cash123")) {
-    currentUserRole = role;
-    document.getElementById("loginScreen").style.display = "none";
-    document.getElementById("appScreen").style.display = "block";
-    const nav = document.getElementById("navButtons");
-    nav.innerHTML = "";
-    if (role === "admin") {
-      nav.innerHTML += `<button class="button-secondary" onclick="showSection('inventory')">Inventory</button>
-                        <button class="button-secondary" onclick="showSection('addProduct')">Add Product</button>`;
+    // Render the inventory table from the 'inventory' array
+    function renderInventory() {
+        inventoryList.innerHTML = '';
+        inventory.forEach(item => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${item.name}</td>
+                <td>${item.quantity}</td>
+                <td>$${item.price.toFixed(2)}</td>
+                <td class="actions-cell">
+                    <button class="edit-btn" data-id="${item.id}">Edit</button>
+                    <button class="delete-btn" data-id="${item.id}">Delete</button>
+                </td>
+            `;
+            inventoryList.appendChild(row);
+        });
     }
-    nav.innerHTML += `<button class="button-secondary" onclick="showSection('saleProduct')">Sell Product</button>
-                      <button class="button-secondary" onclick="showSection('salesReport')">Sales Report</button>`;
-    showSection("inventory");
-  } else {
-    alert("Wrong credentials!");
-  }
-});
 
-productForm.addEventListener("submit", function (e) {
-  e.preventDefault();
-  const name = document.getElementById("productName").value.trim();
-  const qty = parseInt(document.getElementById("productQty").value);
-  const uom = document.getElementById("productUOM").value.trim();
-  const price = parseFloat(document.getElementById("productPrice").value);
-  const editIndex = document.getElementById("editIndex").value;
-
-  if (editIndex === "") {
-    products.push({ name, qty, price, uom });
-  } else {
-    products[editIndex] = { name, qty, price, uom };
-    document.getElementById("editIndex").value = "";
-  }
-  saveData();
-  renderTable();
-  productForm.reset();
-});
-
-searchBox.addEventListener("input", function (e) {
-  renderTable(e.target.value);
-});
-
-saleForm.addEventListener("submit", function (e) {
-  e.preventDefault();
-  const saleMessage = document.getElementById("saleMessage");
-  saleMessage.style.display = "block";
-  const index = parseInt(document.getElementById("saleProductSelect").value);
-  const qtyToSell = parseInt(document.getElementById("saleQty").value);
-  const product = products[index];
-
-  if (qtyToSell > 0 && product.qty >= qtyToSell) {
-    product.qty -= qtyToSell;
-    const total = qtyToSell * product.price;
-    const date = new Date().toISOString().split("T")[0];
-    sales.push({ name: product.name, qty: qtyToSell, total, date });
-    saveData();
-    renderTable();
-    saleMessage.innerText = `✅ Sold ${qtyToSell} of ${product.name} successfully.`;
-    saleMessage.className = "feedback-message success";
-  } else {
-    saleMessage.innerText = "❌ Invalid quantity or insufficient stock!";
-    saleMessage.className = "feedback-message error";
-  }
-  saleForm.reset();
-});
-
-reportDate.addEventListener("input", renderSalesReport);
-
-logoutBtn.addEventListener("click", function () {
-  location.reload();
-});
-
-document.querySelector("#inventoryTable tbody").addEventListener("click", (e) => {
-  if (e.target.classList.contains("edit-btn")) {
-    const index = e.target.dataset.index;
-    const p = products[index];
-    document.getElementById("productName").value = p.name;
-    document.getElementById("productQty").value = p.qty;
-    document.getElementById("productUOM").value = p.uom || "";
-    document.getElementById("productPrice").value = p.price;
-    document.getElementById("editIndex").value = index;
-    showSection("addProduct");
-  }
-
-  if (e.target.classList.contains("delete-btn")) {
-    const index = e.target.dataset.index;
-    if (confirm(`Are you sure you want to delete ${products[index].name}?`)) {
-      products.splice(index, 1);
-      saveData();
-      renderTable(searchBox.value);
+    // Save inventory to local storage
+    function saveInventory() {
+        localStorage.setItem('inventory', JSON.stringify(inventory));
     }
-  }
+
+    // Show the Add/Edit form
+    showAddItemBtn.addEventListener('click', () => {
+        addItemFormSection.classList.remove('hidden');
+        showAddItemBtn.classList.add('hidden');
+        itemForm.reset();
+        itemIdInput.value = '';
+        submitBtn.textContent = 'Add Item';
+    });
+
+    // Cancel and hide the Add/Edit form
+    cancelBtn.addEventListener('click', () => {
+        addItemFormSection.classList.add('hidden');
+        showAddItemBtn.classList.remove('hidden');
+        itemForm.reset();
+    });
+
+    // Handle form submission for adding and editing items
+    itemForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+
+        const id = itemIdInput.value;
+        const name = itemNameInput.value.trim();
+        const quantity = parseInt(itemQuantityInput.value, 10);
+        const price = parseFloat(itemPriceInput.value);
+
+        // Validation
+        if (!name || isNaN(quantity) || quantity < 0 || isNaN(price) || price < 0) {
+            showFeedback('Please fill out all fields correctly.', true);
+            return;
+        }
+
+        if (id) {
+            // Edit existing item
+            const itemIndex = inventory.findIndex(item => item.id === parseInt(id, 10));
+            if (itemIndex !== -1) {
+                inventory[itemIndex] = { ...inventory[itemIndex], name, quantity, price };
+                showFeedback('Item updated successfully!');
+            }
+        } else {
+            // Add new item
+            const newItem = {
+                id: Date.now(), // Simple unique ID
+                name,
+                quantity,
+                price
+            };
+            inventory.push(newItem);
+            showFeedback('Item added successfully!');
+        }
+
+        saveInventory();
+        renderInventory();
+        itemForm.reset();
+        addItemFormSection.classList.add('hidden');
+        showAddItemBtn.classList.remove('hidden');
+    });
+
+    // Handle Edit and Delete button clicks using event delegation
+    inventoryList.addEventListener('click', (e) => {
+        if (e.target.classList.contains('edit-btn')) {
+            const id = parseInt(e.target.dataset.id, 10);
+            const itemToEdit = inventory.find(item => item.id === id);
+
+            if (itemToEdit) {
+                itemIdInput.value = itemToEdit.id;
+                itemNameInput.value = itemToEdit.name;
+                itemQuantityInput.value = itemToEdit.quantity;
+                itemPriceInput.value = itemToEdit.price;
+                addItemFormSection.classList.remove('hidden');
+                showAddItemBtn.classList.add('hidden');
+                submitBtn.textContent = 'Save Changes';
+            }
+        } else if (e.target.classList.contains('delete-btn')) {
+            const id = parseInt(e.target.dataset.id, 10);
+            if (confirm('Are you sure you want to delete this item?')) {
+                inventory = inventory.filter(item => item.id !== id);
+                saveInventory();
+                renderInventory();
+                showFeedback('Item deleted successfully!');
+            }
+        }
+    });
+
+    // Initial render
+    renderInventory();
 });
